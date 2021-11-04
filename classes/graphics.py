@@ -1,21 +1,46 @@
 class Grapher:
     def __init__(self, 
-                 train, test, 
-                 figsize = (11,5), target_colors = {0:'gray',1:'red'}
+                 train, test=[], target_col = 'default_12m',
+                 figsize = (8,4), target_colors = {0:'gray',1:'red'}
                  ):         
 
         self.df_original = (train,test)
-        self.df = train
-        self.target = train['default_12m']
+        self.target = train[target_col]
+        self.df = train.drop(columns=[target_col])
 
         self.test = test
 
         self.plt_figsize = figsize
-        self.plt_target_colors = target_colors
+        self.plt_colored_target = self.target.map(target_colors)
+        self.fplt_dims = {self.scatter:2,
+                          self.scatter3d:3,
+                          self.hist:1}
     
+    def show_all(self,f_plt):
+        '''
+        shows all possible f_plt plots of df
+        Example:
+            g = Grapher( pd.DataFrame({a:[],b:[],c:[]}) )
+            g.show_all(g.scatter) 
+            -> 
+            prints all possible scatter plots:
+            g.scatter(a,b);g.scatter(a,c);g.scatter(b,c)
+
+        !: 
+            if many df columns then there are too many graphs to show
+        '''
+
+        from itertools import combinations as combi
+        n=self.fplt_dims[f_plt]
+
+        for dims in combi(self.df.columns,n):
+            f_plt(*dims)
+
     def scatter(self,
                 x_name = 'ar_management_expenses', y_name = 'ar_net_profit',
-                alpha = 0.3
+                alpha = 0.3,
+                xscale = 'linear',
+                yscale = 'linear'
                 ):
         
         fig, ax = plt.subplots(figsize=self.plt_figsize)
@@ -23,28 +48,18 @@ class Grapher:
         ax.scatter(
                 x = self.df[x_name], 
                 y = self.df[y_name], 
-                c = self.target.map(colors),
+                c = self.plt_colored_target,
                 alpha = alpha
                 )
-        # ax.set_xscale('log')
-        # ax.set_yscale('log')
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)
         plt.xlabel(x_name)
         plt.ylabel(y_name)
 
         plt.show()
 
-    def hist(self, 
-             n_bins = 10):
+    def scatter3d(self):
+        pass
 
-        # fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(nrows=2, ncols=2)
-
-        # colors = ['red', 'tan', 'lime']
-        # ax0.hist(x, n_bins, density=True, histtype='bar', color=colors, label=colors)
-        # ax0.legend(prop={'size': 10})
-        # ax0.set_title('bars with legend')
-
-        # ax1.hist(x, n_bins, density=True, histtype='bar', stacked=True)
-        # ax1.set_title('stacked bar')
-
-        # ax2.hist(x, n_bins, histtype='step', stacked=True, fill=False)
-        # ax2.set_title('stack step (unfilled)')
+    def hist(self, n_bins = 10):
+        pass
