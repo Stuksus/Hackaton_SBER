@@ -23,9 +23,9 @@
 
 ## Результаты:
 - **Accuracy**: 0.65
-- **ROC-AUC**: 0.68
+- **ROC-AUC**: 0.69
 - **ROC-curve**:
-  - ![image](pictures/ROC.png)
+  - <img src="pictures/ROC.png" alt="ROC" style="height:300px;"/>
 - **Benefit-curve**:
   - ![image](pictures/Benefit.png)
 
