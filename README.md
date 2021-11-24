@@ -1,1 +1,39 @@
-# Hackaton_SBER
+# GSB Data Science Practice
+
+## Условия:
+- **Задача**: Предсказать вероятность дефолта(PD) команий
+- **Данные**: 32 395 объектов предоставлющие информацию о компаниях
+- **Целевая метрика**: Accuracy
+- **Вспомогательная метрика**: ROC-AUC
+
+## Последовательность работы с данными:
+- Анализ данных
+- Создание признаков, основываясь на анализе предметной области
+- WOE-binning 
+- Pipeline содержащий в себе:
+  - SMOTE
+  - StantardScaler
+  - Logistic regression
+- Интерпретация модели:
+  - PDP-plots
+  - Benefit-curve
+  - Скоринговая карта
+- Ркомендации:
+  - Предложена метрика для оценивания модели после ее интеграции
+
+## Результаты:
+- **Accuracy**: 0.65
+- **ROC-AUC**: 0.68
+- **ROC-curve**:
+  - ![image](pictures/ROC.png)
+- **Benefit-curve**:
+  - ![image](pictures/Benefit.png)
+
+## Библиотеки использованные в работе:
+- pandas
+- numpy
+- matplotlib
+- sklearn
+- scipy
+- pdpbox
+- mlxtend
