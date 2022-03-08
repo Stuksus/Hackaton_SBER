@@ -23,12 +23,19 @@ top_feat_fin = ['WoE_cut_ab_other_current_assets',
                 'WoE_cut_OER',
                 'WoE_cut_frac_comer_exp']
 
-def predict(df=df_test, model_pipe=model_pipe, top_feat_fin=top_feat_fin, df_train=df_train):
+def predict(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin, df_train=df_train.copy()):
+    final_test = final_test.fillna(final_test.mode().iloc[0])
     final_test = preprocess(df,df_train=df_train)
     return (model_pipe.predict_proba(final_test.loc[:,top_feat_fin])[:,1]>0.539).astype(int)
 
+def preprocess(df,df_train=df_train.copy()):
+    df_cleaned, df_train_cleaned = kill_nulls(df,df_train)
+    df_woe = woe(df_cleaned, df_train_cleaned)
+    return df_woe
+
 def kill_nulls(df,df_train):
     train_df=df_train
+
     # 1
     df = df.drop(['record_id','ul_systematizing_flg'],axis = 1)
 
@@ -37,9 +44,17 @@ def kill_nulls(df,df_train):
     le.fit(train_df['ul_staff_range'])
     df['ul_staff_range'] = le.transform(df['ul_staff_range'])
 
+    ## 2 Train_df stuff ---------------------------
+    train_df['ul_staff_range'] = le.transform(train_df['ul_staff_range'])
+    train_df = train_df.drop(['record_id','ul_systematizing_flg'],axis = 1)
+    train_df = train_df.drop_duplicates() 
+    train_df = kill_outliers(train_df)
 
     # 3
     df_cleaned = calc_fin_statistics(df.fillna(0))
+
+    ## 3 Train_df stuff ---------------------------
+    train_df   = calc_fin_statistics(train_df.fillna(0))
 
 
     # 4
@@ -55,11 +70,18 @@ def kill_nulls(df,df_train):
                         'ar_balance_of_rvns_and_expns']
     df_cleaned = df_cleaned.drop(fin_abs_features, axis = 1)
 
+    ## 4 Train_df stuff ---------------------------
+    train_df = train_df.drop(fin_abs_features, axis = 1)
 
     # 5
     df_cleaned = df_cleaned.fillna(0)
     df_cleaned = df_cleaned.replace(np.inf,0)
     df_cleaned = df_cleaned.replace(-np.inf,0)
+
+    ## 5 Train_df stuff ---------------------------
+    train_df = train_df.fillna(0)
+    train_df = train_df.replace(np.inf,0)
+    train_df = train_df.replace(-np.inf,0)
 
 
     # 6
@@ -68,17 +90,224 @@ def kill_nulls(df,df_train):
                                'bus_age','frac_post_pay','ab_accounts_payable','tax_ratio','ab_own_capital','tumover_ratio',
                                'ab_accounts_receivable','ab_immobilized_assets','ab_inventory','ab_other_borrowings']
     df_cleaned = df_cleaned.drop(corr_columns_to_del_fin,axis =1)
-    return df_cleaned
 
-def preprocess(df,df_train=df_train):
-    df_train = df_train.doppna()
-    df_cleaned, df_train_cleaned = kill_nulls(df,df_train), kill_nulls(df_train,df_train)
-    df_woe = woe(df_cleaned, df_train_cleaned)
-    return df_woe
 
-def woe(df,df_frain):
+    ## 6 Train_df stuff ---------------------------
+    train_df = train_df.drop(corr_columns_to_del_fin,axis =1)
+    return df_cleaned, train_df
+
+def calc_fin_statistics(df):
+    frame = df.copy()
+
+    # общие обязательства
+    total_liabilities = (frame['ab_long_term_liabilities'] + 
+                           frame['ab_other_borrowings'] + 
+                           frame['ab_short_term_borrowing']+ 
+                           frame['ab_accounts_payable'] + frame['ab_borrowed_capital'])
+    
+    # общие активы
+    total_assets = (frame['ab_own_capital']
+                    +frame['ab_cash_and_securities']
+                    +frame['ab_accounts_receivable'] 
+                    +frame['ab_inventory']
+                    +frame['ab_immobilized_assets']
+                    +frame['ab_mobile_current_assets']
+                    +frame['ab_other_current_assets'])
+    
+    # текущие активы
+    current_assets = (frame['ab_mobile_current_assets']
+                      +frame['ab_other_current_assets']
+                      +frame['ab_inventory']
+                      +frame['ab_accounts_receivable'])
+    
+    # текущие обязательства
+    current_liabilities = (frame['ab_accounts_payable']
+                           +frame['ab_short_term_borrowing']
+                           +frame['ab_other_borrowings'])
+    
+    # синтетические признаки
+    frame['frac_post_pay']       = frame['ar_revenue']/frame['ab_accounts_receivable']
+    frame['OPEX']                = frame['ar_total_expenses'] - frame['ar_selling_expenses'] - frame["ar_management_expenses"]
+    frame['OER']                 = frame['OPEX']/frame['ar_revenue']
+    frame['frac_comer_exp']      = frame['ar_selling_expenses' ]/ frame['ar_total_expenses']
+    frame['Net_margin']          = frame['ar_net_profit']/frame['ar_revenue']
+    frame['gross_profit_margin'] = (frame['ar_revenue'] - frame['ar_sale_cost'])/frame['ar_revenue']
+    frame['OP_Margin']           = frame['OPEX']/frame['ar_revenue']
+    frame['ROE']                 = frame['ar_net_profit']/frame['ab_own_capital']
+    frame['ROA']                 = frame['ar_net_profit']/total_assets
+    frame['Debt/EBIT']           = total_liabilities/frame['ar_profit_before_tax']
+    frame['Debt_ratio_betters']  = total_liabilities/total_assets
+    frame['tax_ratio']           = frame['ar_taxes']/frame['ar_profit_before_tax']
+    frame['time_gap']            = frame['ab_accounts_payable']/(frame['ab_cash_and_securities']+frame['ab_accounts_receivable'])
+    frame['borrowing_balance']   = frame['ab_accounts_receivable']/frame['ab_accounts_payable']
+    frame['Debt/Equity']         = total_liabilities/frame['ab_own_capital']
+    frame['current_ratio']       = current_assets/current_liabilities
+    frame['cash_ratio']          = frame['ab_cash_and_securities']/frame['ab_short_term_borrowing']
+    frame['fast_pay']            = (frame['ab_cash_and_securities']+frame['ab_accounts_receivable'])/total_assets
+    frame['tumover_ratio']       = frame['ar_revenue']/total_assets
+
+    return frame
+
+def kill_outliers(train_df=df_train.copy()):
+    def get_df_fin(df):
+        try:
+            frame = df.dropna()
+            frame = frame.set_index('record_id')
+        except KeyError:
+            frame = df.dropna()
+        return frame
+
+    def get_df_nofin(df):
+        try:
+            frame = pd.concat([df, df.dropna()]).drop_duplicates(keep=False)
+            frame =frame.set_index('record_id')
+        except KeyError:
+            frame = pd.concat([df, df.dropna()]).drop_duplicates(keep=False)
+        
+        return frame
+
+    df_fin_train, df_no_fin_train = get_df_fin(train_df), get_df_nofin(train_df)
+    df_no_fin_train[df_no_fin_train['default_12m'] == 1]['default_12m'].sum()
+
+    index_todel = df_fin_train.query('ar_revenue > 300000000 and default_12m == 1').index.tolist()
+    test_remove_outliers = df_fin_train.drop(index_todel,axis =0)
+
+    index_todel = test_remove_outliers.query('ar_total_expenses < 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel,axis =0)
+
+    index_todel_def = test_remove_outliers.query('ar_selling_expenses > 18000000 and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('ar_selling_expenses > 120000000 and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+
+    index_todel_def = test_remove_outliers.query('ar_management_expenses > 14000000 and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('ar_management_expenses > 90000000 and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+
+    index_todel_def = test_remove_outliers.query('(ar_sale_profit < -12000000 or ar_sale_profit > 25000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_sale_profit < -40000000 or ar_sale_profit > 95000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ar_balance_of_rvns_and_expns < -10000000 or ar_balance_of_rvns_and_expns > 5000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_balance_of_rvns_and_expns < -40000000 or ar_balance_of_rvns_and_expns > 38000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ar_profit_before_tax < -10000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_profit_before_tax < -32000000 or ar_profit_before_tax > 80000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ar_taxes > 2000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_taxes < -4000000 or ar_taxes > 13000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def+index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ar_other_profit_and_losses > 300000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_other_profit_and_losses < -500000 or ar_other_profit_and_losses > 3000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ar_net_profit > 14000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ar_net_profit < -21000000 or ar_net_profit > 70000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ab_immobilized_assets > 50000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_immobilized_assets > 250000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ab_mobile_current_assets > 100000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_mobile_current_assets > 350000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ab_immobilized_assets > 30000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_immobilized_assets > 200000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ab_mobile_current_assets > 120000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_mobile_current_assets > 310000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def = test_remove_outliers.query('(ab_cash_and_securities > 7000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_cash_and_securities > 46000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_losses > 8000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_losses > 50000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_own_capital> 47000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_own_capital < -50000000 or ab_own_capital > 210000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_borrowed_capital > 80000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_borrowed_capital > 280000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_long_term_liabilities > 12000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_long_term_liabilities > 80000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_short_term_borrowing > 30000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_short_term_borrowing > 100000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_accounts_payable > 60000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_accounts_payable > 200000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_other_borrowings > 2000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_other_borrowings > 14000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+    
+    index_todel_def =  test_remove_outliers.query('(ab_inventory > 40000000) and default_12m == 1').index.tolist()
+    index_todel_nondef = test_remove_outliers.query('(ab_inventory > 150000000) and default_12m == 0').index.tolist()
+    test_remove_outliers = test_remove_outliers.drop(index_todel_def + index_todel_nondef,axis =0)
+    del index_todel_def
+    del index_todel_nondef
+
+    df_fin_train = test_remove_outliers.copy()
+    df_fin_train = pd.concat([df_fin_train,df_no_fin_train])
+    return df_fin_train
+
+def woe(df, df_train):
     df_fin_test_feature_complex_fillna  = df       
-    df_fin_train_feature_complex_fillna = df_frain 
+    df_fin_train_feature_complex_fillna = df_train 
     def calc_woe_iv(df, feature, target):
         '''
         На выход идет таблица со значениями WoE для каждого значения признака 
@@ -188,56 +417,3 @@ def woe(df,df_frain):
     y_valid_fin = X_valid_fin['default_12m']
     X_valid_fin = X_valid_fin.drop('default_12m',axis =1)
     return final_test
-
-def calc_fin_statistics(df):
-    frame = df.copy()
-
-    # общие обязательства
-    total_liabilities = (frame['ab_long_term_liabilities'] + 
-                           frame['ab_other_borrowings'] + 
-                           frame['ab_short_term_borrowing']+ 
-                           frame['ab_accounts_payable'] + frame['ab_borrowed_capital'])
-    
-    # общие активы
-    total_assets = (frame['ab_own_capital']
-                    +frame['ab_cash_and_securities']
-                    +frame['ab_accounts_receivable'] 
-                    +frame['ab_inventory']
-                    +frame['ab_immobilized_assets']
-                    +frame['ab_mobile_current_assets']
-                    +frame['ab_other_current_assets'])
-    
-    # текущие активы
-    current_assets = (frame['ab_mobile_current_assets']
-                      +frame['ab_other_current_assets']
-                      +frame['ab_inventory']
-                      +frame['ab_accounts_receivable'])
-    
-    # текущие обязательства
-    current_liabilities = (frame['ab_accounts_payable']
-                           +frame['ab_short_term_borrowing']
-                           +frame['ab_other_borrowings'])
-    
-    # синтетические признаки
-    frame['frac_post_pay']       = frame['ar_revenue']/frame['ab_accounts_receivable']
-    frame['OPEX']                = frame['ar_total_expenses'] - frame['ar_selling_expenses'] - frame["ar_management_expenses"]
-    frame['OER']                 = frame['OPEX']/frame['ar_revenue']
-    frame['frac_comer_exp']      = frame['ar_selling_expenses' ]/ frame['ar_total_expenses']
-    frame['Net_margin']          = frame['ar_net_profit']/frame['ar_revenue']
-    frame['gross_profit_margin'] = (frame['ar_revenue'] - frame['ar_sale_cost'])/frame['ar_revenue']
-    frame['OP_Margin']           = frame['OPEX']/frame['ar_revenue']
-    frame['ROE']                 = frame['ar_net_profit']/frame['ab_own_capital']
-    frame['ROA']                 = frame['ar_net_profit']/total_assets
-    frame['Debt/EBIT']           = total_liabilities/frame['ar_profit_before_tax']
-    frame['Debt_ratio_betters']  = total_liabilities/total_assets
-    frame['tax_ratio']           = frame['ar_taxes']/frame['ar_profit_before_tax']
-    frame['time_gap']            = frame['ab_accounts_payable']/(frame['ab_cash_and_securities']+frame['ab_accounts_receivable'])
-    frame['borrowing_balance']   = frame['ab_accounts_receivable']/frame['ab_accounts_payable']
-    frame['Debt/Equity']         = total_liabilities/frame['ab_own_capital']
-    frame['current_ratio']       = current_assets/current_liabilities
-    frame['cash_ratio']          = frame['ab_cash_and_securities']/frame['ab_short_term_borrowing']
-    frame['fast_pay']            = (frame['ab_cash_and_securities']+frame['ab_accounts_receivable'])/total_assets
-    frame['tumover_ratio']       = frame['ar_revenue']/total_assets
-
-    return frame
-
