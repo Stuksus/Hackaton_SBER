@@ -24,8 +24,8 @@ top_feat_fin = ['WoE_cut_ab_other_current_assets',
                 'WoE_cut_frac_comer_exp']
 
 def predict(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin, df_train=df_train.copy()):
-    final_test = final_test.fillna(final_test.mode().iloc[0])
     final_test = preprocess(df,df_train=df_train)
+    final_test = final_test.fillna(final_test.mode().iloc[0])
     return (model_pipe.predict_proba(final_test.loc[:,top_feat_fin])[:,1]>0.539).astype(int)
 
 def preprocess(df,df_train=df_train.copy()):
