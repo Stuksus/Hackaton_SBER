@@ -70,12 +70,11 @@ def kill_nulls(df,df_train):
     df_cleaned = df_cleaned.drop(corr_columns_to_del_fin,axis =1)
     return df_cleaned
 
-
 def preprocess(df,df_train=df_train):
+    df_train = df_train.doppna()
     df_cleaned, df_train_cleaned = kill_nulls(df,df_train), kill_nulls(df_train,df_train)
     df_woe = woe(df_cleaned, df_train_cleaned)
     return df_woe
-
 
 def woe(df,df_frain):
     df_fin_test_feature_complex_fillna  = df       
