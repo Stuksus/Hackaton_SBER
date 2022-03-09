@@ -23,8 +23,8 @@ top_feat_fin = ['WoE_cut_ab_other_current_assets',
                 'WoE_cut_OER',
                 'WoE_cut_frac_comer_exp']
 
-def predict(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin, df_train=df_train.copy()):
-    final_test = preprocess(df,df_train=df_train)
+def predict(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin.copy(), df_train=df_train.copy()):
+    final_test = preprocess(df.copy(),df_train=df_train.copy())
     final_test = final_test.fillna(final_test.mode().iloc[0])
     return (model_pipe.predict_proba(final_test.loc[:,top_feat_fin])[:,1]>0.539).astype(int)
 
@@ -34,7 +34,7 @@ def preprocess(df,df_train=df_train.copy()):
     return df_woe
 
 def kill_nulls(df,df_train):
-    train_df=df_train
+    train_df=df_train.copy()
 
     # 1
     df = df.drop(['record_id','ul_systematizing_flg'],axis = 1)
@@ -306,8 +306,8 @@ def kill_outliers(train_df=df_train.copy()):
     return df_fin_train
 
 def woe(df, df_train):
-    df_fin_test_feature_complex_fillna  = df       
-    df_fin_train_feature_complex_fillna = df_train 
+    df_fin_test_feature_complex_fillna  = df.copy()       
+    df_fin_train_feature_complex_fillna = df_train.copy() 
     def calc_woe_iv(df, feature, target):
         '''
         На выход идет таблица со значениями WoE для каждого значения признака 
