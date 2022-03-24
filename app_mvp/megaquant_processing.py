@@ -23,15 +23,24 @@ top_feat_fin = ['WoE_cut_ab_other_current_assets',
                 'WoE_cut_OER',
                 'WoE_cut_frac_comer_exp']
 
+@st.cache
 def predict(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin.copy(), df_train=df_train.copy()):
     final_test = preprocess(df.copy(),df_train=df_train.copy())
     final_test = final_test.fillna(final_test.mode().iloc[0])
     return (model_pipe.predict_proba(final_test.loc[:,top_feat_fin])[:,1]>0.539).astype(int)
 
+def predict_pretty(df=df_test.copy(), model_pipe=model_pipe, top_feat_fin=top_feat_fin.copy(), df_train=df_train.copy()):
+    final_test = preprocess(df.copy(),df_train=df_train.copy())
+    final_test = final_test.fillna(final_test.mode().iloc[0])
+    proba = model_pipe.predict_proba(final_test.loc[:,top_feat_fin])[:,1]
+    pred = (proba>0.539).astype(int)
+    return pd.DataFrame(pd.DataFrame([proba,pred,])).T.rename(columns={0:'Вероятность Дефолта',1:'Результат модели'}).T
+
 def preprocess(df,df_train=df_train.copy()):
     df_cleaned, df_train_cleaned = kill_nulls(df,df_train)
     df_woe = woe(df_cleaned, df_train_cleaned)
     return df_woe
+
 
 def kill_nulls(df,df_train):
     train_df=df_train.copy()
@@ -417,3 +426,19 @@ def woe(df, df_train):
     y_valid_fin = X_valid_fin['default_12m']
     X_valid_fin = X_valid_fin.drop('default_12m',axis =1)
     return final_test
+
+def make_df_ready_for_viz(df_test,test_predict=predict_pretty(df_test)):
+    df_cleaned, stats_context = kill_nulls(df_test.copy(),df_train)
+    stats_context = stats_context[[feat[8:] for feat in top_feat_fin]+['default_12m']].rename(columns={'default_12m':'Результат модели'})
+
+    df_stats = df_cleaned[[feat[8:] for feat in top_feat_fin]]
+
+    df_stats['Вероятность Дефолта'] = test_predict.T['Вероятность Дефолта']
+    df_stats['Результат модели']    = test_predict.T['Результат модели'].astype(int).astype(str)
+    df_stats['выборка']             = 'введенная выборка'
+
+    stats_context['Вероятность Дефолта'] = stats_context['Результат модели']
+    stats_context['Результат модели']    = stats_context['Результат модели'].astype(int).astype(str)
+    stats_context['выборка']             = 'выборка, на которой проводилось обучение'
+    df_stats = pd.concat([df_stats,stats_context])
+    return df_stats
