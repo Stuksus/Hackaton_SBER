@@ -12,7 +12,7 @@ from functionforDownloadButtons import download_button
 
 ###################################
 
-# import megaquant_processing
+import megaquant_processing as mp
 
 ###################################
 
@@ -32,7 +32,7 @@ def _max_width_():
     )
 
 st.set_page_config(page_icon="💰", page_title="PD Model | MegaQuant")
-st.title("Hello Elizabeth!")
+st.title("Привет Елизавета!")
 
 ###################################        META        ###################################
 ##########################################################################################
@@ -50,14 +50,14 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file is not None:
     file_container = st.expander("Был введен следующий csv файл")
-    shows = pd.read_csv(uploaded_file)
+    shows = pd.read_csv(uploaded_file, sep=';')
     uploaded_file.seek(0)
     file_container.write(shows)
 
 else:
     st.sidebar.info(
         f"""
-            👆 Попробуйте загрузить [df_test.csv](https://hse.kamran.uz)
+            👆 Попробуйте загрузить [df_test.csv](https://hse.kamran.uz/ps22/df_test.csv)
             """
     )
 
@@ -65,39 +65,39 @@ else:
         record_id                   = 0
         ar_revenue                  = st.sidebar.number_input('ar_revenue',                   value=0)
         ar_total_expenses           = st.sidebar.number_input('ar_total_expenses',            value=0)
-        ar_sale_cost                = st.sidebar.number_input('ar_sale_cost',                 value=0)
+        ar_sale_cost                = 1
         ar_selling_expenses         = st.sidebar.number_input('ar_selling_expenses',          value=0)
         ar_management_expenses      = st.sidebar.number_input('ar_management_expenses',       value=0)
-        ar_sale_profit              = st.sidebar.number_input('ar_sale_profit',               value=0)
-        ar_balance_of_rvns_and_expns= st.sidebar.number_input('ar_balance_of_rvns_and_expns', value=0)
-        ar_profit_before_tax        = st.sidebar.number_input('ar_profit_before_tax',         value=0)
-        ar_taxes                    = st.sidebar.number_input('ar_taxes', value=0)
-        ar_other_profit_and_losses  = st.sidebar.number_input('ar_other_profit_and_losses', value=0)
-        ar_net_profit               = st.sidebar.number_input('ar_net_profit', value=0)
-        ab_immobilized_assets       = st.sidebar.number_input('ab_immobilized_assets', value=0)
-        ab_mobile_current_assets    = st.sidebar.number_input('ab_mobile_current_assets', value=0)
-        ab_inventory                = st.sidebar.number_input('ab_inventory', value=0)
-        ab_accounts_receivable      = st.sidebar.number_input('ab_accounts_receivable', value=0)
+        ar_sale_profit              = 1
+        ar_balance_of_rvns_and_expns= 1
+        ar_profit_before_tax        = 1
+        ar_taxes                    = 1
+        ar_other_profit_and_losses  = 1
+        ar_net_profit               = 1
+        ab_immobilized_assets       = 1
+        ab_mobile_current_assets    = 1
+        ab_inventory                = 1
+        ab_accounts_receivable      = 1
         ab_other_current_assets     = st.sidebar.number_input('ab_other_current_assets', value=0)
         ab_cash_and_securities      = st.sidebar.number_input('ab_cash_and_securities', value=0)
         ab_losses                   = st.sidebar.number_input('ab_losses', value=0)
-        ab_own_capital              = st.sidebar.number_input('ab_own_capital', value=0)
-        ab_borrowed_capital         = st.sidebar.number_input('ab_borrowed_capital', value=0)
+        ab_own_capital              = 1
+        ab_borrowed_capital         = 1
         ab_long_term_liabilities    = st.sidebar.number_input('ab_long_term_liabilities', value=0)
         ab_short_term_borrowing     = st.sidebar.number_input('ab_short_term_borrowing', value=0)
-        ab_accounts_payable         = st.sidebar.number_input('ab_accounts_payable', value=0)
-        ab_other_borrowings         = st.sidebar.number_input('ab_other_borrowings', value=0)
-        bus_age                     = st.sidebar.slider('bus_age',         0, 1000, 156)
+        ab_accounts_payable         = 1
+        ab_other_borrowings         = 1
+        bus_age                     = 1
         ogrn_age                    = st.sidebar.slider('ogrn_age',        0, 1000, 135)
-        adr_actual_age              = st.sidebar.slider('adr_actual_age',  0, 1000, 3)
-        head_actual_age             = st.sidebar.slider('head_actual_age', 0, 1000, 3)
+        adr_actual_age              = 1
+        head_actual_age             = 1
         cap_actual_age              = st.sidebar.slider('cap_actual_age',  0, 1000, 3)
         ul_staff_range              = st.sidebar.select_slider('ar_sale_cost', ('[1-100]', '(100-500]', '> 500'))
-        ul_capital_sum              = st.sidebar.slider('', 0, 130, 25)
-        ul_founders_cnt             = st.sidebar.number_input('ar_sale_cost', 1, 10000, 3)
-        ul_branch_cnt               = st.sidebar.slider('', 0, 130, 0)
-        ul_strategic_flg            = 0
-        ul_systematizing_flg        = 0
+        ul_capital_sum              = st.sidebar.slider('ul_capital_sum', 0, 130, 25)
+        ul_founders_cnt             = 1
+        ul_branch_cnt               = st.sidebar.slider('ul_strategic_flg', 0, 130, 0)
+        ul_strategic_flg            = st.sidebar.select_slider('ar_sale_cost', (0,1))
+        ul_systematizing_flg        = 1
         data = {
                 'record_id'                   : record_id,
                 'ar_revenue'                  : ar_revenue,
@@ -158,8 +158,6 @@ gb.configure_side_bar()  # side_bar is clearly a typo :) should by sidebar
 gridOptions = gb.build()
 
 
-import plotly.figure_factory as ff
-import numpy as np
 
 
 ###################################        DISPLAY CSV        ##################################
@@ -169,30 +167,43 @@ import numpy as np
 
 #__________________________________        SHOW METRICS      __________________________________#
 df = shows
+df_stats = mp.make_df_ready_for_viz(df)
 
-def make_fig():
-    # Add histogram data
-    x1 = np.random.randn(200) - 2
-    x2 = np.random.randn(200)
-    x3 = np.random.randn(200) + 2
-
-    # Group data together
-    hist_data = [x1, x2, x3]
-
-    group_labels = ['Group 1', 'Group 2', 'Group 3']
-
-    # Create distplot with custom bin_size
-    fig = ff.create_distplot(
-             hist_data, group_labels, bin_size=[.1, .25, .5])
-
+def scatter_3d(df_stats, x,y,z):
+    import plotly.express as px
+    fig = px.scatter_3d(df_stats, x,y,z,
+                        color='Вероятность Дефолта',
+                        symbol='выборка',
+                        hover_name='выборка',
+                        opacity=0.4,
+                        size=df_stats['выборка'].replace({'выборка, на которой проводилось обучение': 0.1, 'введенная выборка':2}))
+    fig.update_layout(coloraxis_colorbar_x=-0.15)
     return fig
 
-# Plot! 
-fig = make_fig()
-st.plotly_chart(fig, use_container_width=True)
+def scatter_2d(df_stats, x,y):
+    import plotly.express as px
+    fig = px.scatter(df_stats, x,y, 
+                     color='Результат модели', 
+                     marginal_x="box", 
+                     marginal_y="histogram",
+                     symbol='выборка',
+                     opacity=0.4,
+                     size=df_stats['выборка'].replace({'выборка, на которой проводилось обучение': 0.1, 'введенная выборка':1}))
+    fig.update_layout(coloraxis_colorbar_x=-0.3)
+    return fig
+c1,c2,c3 = st.columns([1, 1, 1])
 
-# for col in df.columns:
-#     st.metric(label = str(col),  value = str(df[col].mode()[0]), delta="")
+with c1:
+    x = st.selectbox('X',df_stats.columns)
+with c2:
+    y = st.selectbox('Y',df_stats.columns)
+with c3:
+    z = st.selectbox('Z',df_stats.columns)
+fig_3d = scatter_3d(df_stats, x,y,z)
+fig_2d = scatter_2d(df_stats, x,y)
+
+st.plotly_chart(fig_3d, use_container_width=True)
+st.plotly_chart(fig_2d, use_container_width=True)
 
 ###################################      SHOW METRICS         ##################################
 ################################################################################################
@@ -201,6 +212,8 @@ st.plotly_chart(fig, use_container_width=True)
 
 
 #__________________________________       PREDICT  CSV        __________________________________#
+
+st.subheader("Предсказания 👇 ")
 
 c29, c30, c31 = st.columns([1, 1, 2])
 
@@ -215,28 +228,25 @@ response = AgGrid(
 
 df = pd.DataFrame(response["selected_rows"])
 
-st.subheader("Предсказания 👇 ")
-
 @st.cache
 def predict(shows):
-    import megaquant_processing as mp
-    return mp.predict(shows.copy())
+    return mp.predict_pretty(shows.copy())
 
+prediction = predict(shows)
 
 with c29:
-    st.text("")
-
-    prediction = predict(shows)
-    st.dataframe(prediction)
-
-    st.text("")
-
-with c31:
     CSVButton = download_button(
-        pd.DataFrame(prediction),
+        pd.DataFrame(prediction).T,
         'prediction.csv',
         'скачать предсказание'
     )
+
+with c31:
+    st.text("")
+
+    st.dataframe(pd.DataFrame(prediction))
+
+    st.text("")
 
 ###################################       PREDICT  CSV        ##################################
 ################################################################################################
